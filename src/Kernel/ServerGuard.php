@@ -8,7 +8,6 @@
  * This source file is subject to the MIT license that is bundled
  * with this source code in the file LICENSE.
  */
-
 namespace EasyWeChat\Kernel;
 
 use EasyWeChat\Kernel\Contracts\MessageInterface;
@@ -37,6 +36,7 @@ class ServerGuard
     use Observable, ResponseCastable;
 
     /**
+     *
      * @var bool
      */
     protected $alwaysValidate = false;
@@ -47,6 +47,7 @@ class ServerGuard
     const SUCCESS_EMPTY_RESPONSE = 'success';
 
     /**
+     *
      * @var array
      */
     const MESSAGE_TYPE_MAPPING = [
@@ -61,10 +62,11 @@ class ServerGuard
         'device_text' => Message::DEVICE_TEXT,
         'event' => Message::EVENT,
         'file' => Message::FILE,
-        'miniprogrampage' => Message::MINIPROGRAM_PAGE,
+        'miniprogrampage' => Message::MINIPROGRAM_PAGE
     ];
 
     /**
+     *
      * @var \EasyWeChat\Kernel\ServiceContainer
      */
     protected $app;
@@ -81,7 +83,10 @@ class ServerGuard
         $this->app = $app;
 
         foreach ($this->app->extension->observers() as $observer) {
-            call_user_func_array([$this, 'push'], $observer);
+            call_user_func_array([
+                $this,
+                'push'
+            ], $observer);
         }
     }
 
@@ -100,32 +105,35 @@ class ServerGuard
             'method' => $this->app['request']->getMethod(),
             'uri' => $this->app['request']->getUri(),
             'content-type' => $this->app['request']->getContentType(),
-            'content' => $this->app['request']->getContent(),
+            'content' => $this->app['request']->getContent()
         ]);
 
         $response = $this->validate()->resolve();
 
-        $this->app['logger']->debug('Server response created:', ['content' => $response->getContent()]);
+        $this->app['logger']->debug('Server response created:', [
+            'content' => $response->getContent()
+        ]);
 
         return $response;
     }
 
     /**
+     *
      * @return $this
      *
      * @throws \EasyWeChat\Kernel\Exceptions\BadRequestException
      */
     public function validate()
     {
-        if (!$this->alwaysValidate && !$this->isSafeMode()) {
+        if (! $this->alwaysValidate && ! $this->isSafeMode()) {
             return $this;
         }
 
         if ($this->app['request']->get('signature') !== $this->signature([
-                $this->getToken(),
-                $this->app['request']->get('timestamp'),
-                $this->app['request']->get('nonce'),
-            ])) {
+            $this->getToken(),
+            $this->app['request']->get('timestamp'),
+            $this->app['request']->get('nonce')
+        ])) {
             throw new BadRequestException('Invalid request signature.', 400);
         }
 
@@ -157,11 +165,11 @@ class ServerGuard
     {
         $message = $this->parseMessage($this->app['request']->getContent(false));
 
-        if (!is_array($message) || empty($message)) {
+        if (! is_array($message) || empty($message)) {
             throw new BadRequestException('No message received.');
         }
 
-        if ($this->isSafeMode() && !empty($message['Encrypt'])) {
+        if ($this->isSafeMode() && ! empty($message['Encrypt'])) {
             $message = $this->decryptMessage($message);
 
             // Handle JSON format.
@@ -188,7 +196,11 @@ class ServerGuard
      */
     public function getRawMessage()
     {
-        return $this->app['request']->getContent(false);
+        $message = $this->app['request']->getContent(false);
+        if ($this->isSafeMode() && ! empty($message['Encrypt'])) {
+            $message = $this->decryptMessage($message);
+        }
+        return $message;
     }
 
     /**
@@ -208,14 +220,13 @@ class ServerGuard
             return new Response($result['response']);
         }
 
-        return new Response(
-            $this->buildResponse($result['to'], $result['from'], $result['response']),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        return new Response($this->buildResponse($result['to'], $result['from'], $result['response']), 200, [
+            'Content-Type' => 'application/xml'
+        ]);
     }
 
     /**
+     *
      * @return string|null
      */
     protected function getToken()
@@ -224,8 +235,9 @@ class ServerGuard
     }
 
     /**
-     * @param string                                                   $to
-     * @param string                                                   $from
+     *
+     * @param string $to
+     * @param string $from
      * @param \EasyWeChat\Kernel\Contracts\MessageInterface|string|int $message
      *
      * @return string
@@ -250,7 +262,7 @@ class ServerGuard
             $message = new News($message);
         }
 
-        if (!($message instanceof Message)) {
+        if (! ($message instanceof Message)) {
             throw new InvalidArgumentException(sprintf('Invalid Messages type "%s".', gettype($message)));
         }
 
@@ -277,15 +289,15 @@ class ServerGuard
         return [
             'to' => $messageArray['FromUserName'] ?? '',
             'from' => $messageArray['ToUserName'] ?? '',
-            'response' => $response,
+            'response' => $response
         ];
     }
 
     /**
      * Build reply XML.
      *
-     * @param string                                        $to
-     * @param string                                        $from
+     * @param string $to
+     * @param string $from
      * @param \EasyWeChat\Kernel\Contracts\MessageInterface $message
      *
      * @return string
@@ -296,7 +308,7 @@ class ServerGuard
             'ToUserName' => $to,
             'FromUserName' => $from,
             'CreateTime' => time(),
-            'MsgType' => $message->getType(),
+            'MsgType' => $message->getType()
         ];
 
         $response = $message->transformToXml($prepends);
@@ -310,6 +322,7 @@ class ServerGuard
     }
 
     /**
+     *
      * @param array $params
      *
      * @return string
@@ -360,6 +373,7 @@ class ServerGuard
     }
 
     /**
+     *
      * @return bool
      */
     protected function shouldReturnRawResponse(): bool
@@ -368,17 +382,13 @@ class ServerGuard
     }
 
     /**
+     *
      * @param array $message
      *
      * @return mixed
      */
     protected function decryptMessage(array $message)
     {
-        return $message = $this->app['encryptor']->decrypt(
-            $message['Encrypt'],
-            $this->app['request']->get('msg_signature'),
-            $this->app['request']->get('nonce'),
-            $this->app['request']->get('timestamp')
-        );
+        return $message = $this->app['encryptor']->decrypt($message['Encrypt'], $this->app['request']->get('msg_signature'), $this->app['request']->get('nonce'), $this->app['request']->get('timestamp'));
     }
 }
