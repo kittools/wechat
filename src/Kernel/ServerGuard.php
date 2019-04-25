@@ -197,8 +197,9 @@ class ServerGuard
     public function getRawMessage()
     {
         $message = $this->app['request']->getContent(false);
-        if ($this->isSafeMode() && ! empty($message['Encrypt'])) {
-            $message = $this->decryptMessage($message);
+        $messageArray = $this->parseMessage($message);
+        if ($this->isSafeMode() && ! empty($messageArray['Encrypt'])) {
+            $message = $this->decryptMessage($messageArray);
         }
         return $message;
     }
